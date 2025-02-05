@@ -1,3 +1,12 @@
+#                           GRAPH NETWORK
+#               (0)---5---(2)---1---(3)---3---(1)
+#                                    |        /
+#                                    |       /
+#                                    1     7
+#                                    |    /
+#                                    |   /
+#                                     (4)
+
 import heapq
 import itertools
 from collections import defaultdict
@@ -64,7 +73,6 @@ def find_k_shortest_paths(graph_network, k):
 
 def usage_link(graph_network, all_paths):
     
-    
     link_usage = defaultdict(int)
     selected_paths = {}
 
@@ -78,10 +86,12 @@ def usage_link(graph_network, all_paths):
             current_link_usage = 0
             for i in range(len(path) - 1):
                 link = tuple(sorted((path[i], path[i + 1])))
-                current_link_usage += link_usage[link]
+                # the times this link is used from the link_usage dictionary & add
+                current_link_usage += link_usage[link] 
 
             # choose link --> least usage --> keep it
             if min_link_usage > current_link_usage :
+                # the new best path (kept_path)
                 min_link_usage = current_link_usage
                 kept_path = (cost, path)
 
@@ -97,7 +107,7 @@ def usage_link(graph_network, all_paths):
     for (start, end), (cost, path) in selected_paths.items():
         print(f"Path from {start} to {end}: Cost = {cost}, Route = {path}")
 
-        # Calculate usage statistics
+    # Calculate usage statistics
     usages = list(link_usage.values())
     min_link_usage = min(usages) if usages else 0
     max_usage = max(usages) if usages else 0
@@ -109,16 +119,15 @@ def usage_link(graph_network, all_paths):
     print(f"Min use of a link node: {min_link_usage}")
     print(f"Max use of a link node: {max_usage}")
     print(f"Average use of a link node: {avg_usage:.2f}")
+    print("\n")
 
+    for link, usage in link_usage.items():
+        print(f"Link {link}: was used {usage} times")
 
     print("\n")
     print("Traffic Matrix:")
     for row in traffic_matrix:
         print(row)
-    print("\n")
-
-    for link, usage in link_usage.items():
-        print(f"Link {link}: was used {usage} times")
 
     print("\n")    
     for link, usage in link_usage.items():
@@ -136,6 +145,7 @@ def assign_wavelengths(selected_paths, traffic_matrix, wavelengths, algorithms):
         links = [(path[i], path[i + 1]) for i in range(len(path) - 1)]
         links_of_nodes[(source, destination)] = links
 
+    # dictionary that stores the traffic between nodes
     traffic_dict = {
         (source, destination): traffic_matrix[source][destination]
         for source in range(len(traffic_matrix))
@@ -143,7 +153,9 @@ def assign_wavelengths(selected_paths, traffic_matrix, wavelengths, algorithms):
         if traffic_matrix[source][destination] > 0
     }
 
+    #dict of total number of required wavelengths for each link
     link_occurrences = {}
+
     for (source, destination), links in links_of_nodes.items():
         demand = traffic_dict.get((source, destination), 0)
         
@@ -181,21 +193,21 @@ def assign_wavelengths(selected_paths, traffic_matrix, wavelengths, algorithms):
         for link, required_wavelengths in link_occurrences.items():
             assigned_wavelengths = []
             
+            # 1 to wavelength
             for w in range(1, wavelengths + 1):
                 if len(assigned_wavelengths) < required_wavelengths:
                     assigned_wavelengths.append(w)
-            
-            if len(assigned_wavelengths) < required_wavelengths:
-                blocked_links.append(link)
-            else:
+
+            if len(assigned_wavelengths) == required_wavelengths:
                 wavelength_assignments[link] = assigned_wavelengths
+            else:
+                blocked_links.append(link)
+
 
     elif algorithms == "Least-Used":
-        for link, required_wavelengths in sorted(link_occurrences.items(), key=lambda x: x[1], reverse=True):
-            least_used_wavelengths = sorted(
-                range(1, wavelengths + 1), 
-                key=lambda w: wavelength_usage[w]
-            )
+        # links with the highest demand will be assigned first
+        for link, required_wavelengths in sorted(link_occurrences.items(), key=lambda x: x[1], reverse=True): # links are sorted by the number of waveforms they require
+            least_used_wavelengths = sorted(range(1, wavelengths + 1), key=lambda w: wavelength_usage[w]) # number of times waveform w has been used
             
             assigned_wavelengths = []
             for w in least_used_wavelengths:
@@ -208,8 +220,10 @@ def assign_wavelengths(selected_paths, traffic_matrix, wavelengths, algorithms):
             else:
                 wavelength_assignments[link] = assigned_wavelengths
 
+    # blocked links
     blocked_percentage = (len(blocked_links) / len(link_occurrences)) * 100 if link_occurrences else 0
 
+    # assign wavelengths labeled
     wavelength_labels = {w: f'λ{w}' for w in range(1, wavelengths + 1)}
     wavelength_assignments_labeled = {}
     for link, wavelengths_list in wavelength_assignments.items():
@@ -217,7 +231,7 @@ def assign_wavelengths(selected_paths, traffic_matrix, wavelengths, algorithms):
 
     # bidirectional link of nodes
     bidirectional_assignments = {}
-    processed_links = set()
+    processed_links = set() # to avoid processing the same link in the reverse direction
     
     for link, wavelengths_list in wavelength_assignments_labeled.items():
         if link not in processed_links:
