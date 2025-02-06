@@ -113,7 +113,6 @@ def usage_link(graph_network, all_paths):
     max_usage = max(usages) if usages else 0
     avg_usage = sum(usages) / len(usages) if usages else 0
 
-
     # print 
     print("\nThe Statistics:")
     print(f"Min use of a link node: {min_link_usage}")
@@ -129,6 +128,7 @@ def usage_link(graph_network, all_paths):
     for row in traffic_matrix:
         print(row)
 
+    # ASSIGN WAVELENGTHS - 1
     print("\n")    
     for link, usage in link_usage.items():
         # assign wavelengths to each link of nodes that exists
@@ -153,7 +153,9 @@ def assign_wavelengths(selected_paths, traffic_matrix, wavelengths, algorithms):
         if traffic_matrix[source][destination] > 0
     }
 
-    #dict of total number of required wavelengths for each link
+    # ASSIGN WAVELENGTHS - 2
+    
+    #dict of times the link is used
     link_occurrences = {}
 
     for (source, destination), links in links_of_nodes.items():
@@ -172,33 +174,35 @@ def assign_wavelengths(selected_paths, traffic_matrix, wavelengths, algorithms):
                     link_occurrences[symmetric_link] = 0
                 link_occurrences[symmetric_link] += demand * req_wavelengths
 
+
     wavelength_assignments = {}
     blocked_links = []
+
     wavelength_usage = collections.defaultdict(int)
     
     if algorithms == "Random":
-        for link, required_wavelengths in link_occurrences.items():
+        for link, link_appearances in link_occurrences.items():
             available_wavelengths = list(range(1, wavelengths + 1))
             random.shuffle(available_wavelengths)
             
-            if required_wavelengths > len(available_wavelengths):
+            if link_appearances > len(available_wavelengths):
                 blocked_links.append(link)
             else:
-                wavelength_assignments[link] = available_wavelengths[:required_wavelengths]
+                wavelength_assignments[link] = available_wavelengths[:link_appearances]
 
     elif algorithms == "First-Fit":
         wavelength_assignments = {}
         blocked_links = []
         
-        for link, required_wavelengths in link_occurrences.items():
+        for link, link_appearances in link_occurrences.items():
             assigned_wavelengths = []
             
             # 1 to wavelength
             for w in range(1, wavelengths + 1):
-                if len(assigned_wavelengths) < required_wavelengths:
+                if len(assigned_wavelengths) < link_appearances:
                     assigned_wavelengths.append(w)
 
-            if len(assigned_wavelengths) == required_wavelengths:
+            if len(assigned_wavelengths) == link_appearances:
                 wavelength_assignments[link] = assigned_wavelengths
             else:
                 blocked_links.append(link)
@@ -206,16 +210,17 @@ def assign_wavelengths(selected_paths, traffic_matrix, wavelengths, algorithms):
 
     elif algorithms == "Least-Used":
         # links with the highest demand will be assigned first
-        for link, required_wavelengths in sorted(link_occurrences.items(), key=lambda x: x[1], reverse=True): # links are sorted by the number of waveforms they require
-            least_used_wavelengths = sorted(range(1, wavelengths + 1), key=lambda w: wavelength_usage[w]) # number of times waveform w has been used
+        for link, link_appearances in sorted(link_occurrences.items(), key=lambda x: x[1], reverse=True): # links are sorted by the number of waveforms they require
+            # list: wavelengths in order of how often they are used, from least used to most.
+            least_used_wavelengths = sorted(range(1, wavelengths + 1), key=lambda w: wavelength_usage[w]) 
             
             assigned_wavelengths = []
             for w in least_used_wavelengths:
-                if len(assigned_wavelengths) < required_wavelengths:
+                if len(assigned_wavelengths) < link_appearances:
                     assigned_wavelengths.append(w)
                     wavelength_usage[w] += 1
             
-            if len(assigned_wavelengths) < required_wavelengths:
+            if len(assigned_wavelengths) < link_appearances:
                 blocked_links.append(link)
             else:
                 wavelength_assignments[link] = assigned_wavelengths
@@ -224,6 +229,7 @@ def assign_wavelengths(selected_paths, traffic_matrix, wavelengths, algorithms):
     blocked_percentage = (len(blocked_links) / len(link_occurrences)) * 100 if link_occurrences else 0
 
     # assign wavelengths labeled
+    # key : wavelength number % value : label
     wavelength_labels = {w: f'λ{w}' for w in range(1, wavelengths + 1)}
     wavelength_assignments_labeled = {}
     for link, wavelengths_list in wavelength_assignments.items():
